@@ -29,7 +29,7 @@ Das System benötigt eine Schnittstelle für GPS, Navigationsdaten und Routen.
 Das System vermittelt eine Navigation in Echtzeit.
 Das System benötigt einen Kamerazugang.
 Das System muss keine Daten persistent speichern.
-Das System läuft idealerweise als Applikation auf einem mobilen Kamerafähigen gerät.
+Das System läuft idealerweise als Applikation auf einem mobilen kamerafähigen Gerät.
 Das System benötigt Internetzugang.
 Die Wegweiser müssen klar und deutlich in AR Umgebung platziert sein.
 
