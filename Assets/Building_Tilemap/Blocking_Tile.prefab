@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 261393592387104058}
   - component: {fileID: 8020522756938393047}
   - component: {fileID: 8563880422557647362}
+  - component: {fileID: -1884586096281839234}
   m_Layer: 0
   m_Name: Blocking_Tile
   m_TagString: Untagged
@@ -92,8 +93,42 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 671b69f09297f9d409374ddc3ff6f4eb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  position2d: {x: 0, y: 0}
+  x_pos: 0
+  y_pos: 0
   object_type: 1
-  max_repulsive_value: 0
-  max_rep_distance: 0
-  cmap_object: {fileID: 1912095778427333254, guid: dd3e70d902dd1fe4cb8bb863d6c7ea9e,
-    type: 3}
+  travel_cost: 0
+  isNode: 0
+  invalidNode: 0
+  isEdge: 0
+  isNodeAlready: 0
+  traveltime: Infinity
+  activated: 0
+  neighbors: []
+  is_occupied: 0
+--- !u!61 &-1884586096281839234
+BoxCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 488286647258456261}
+  m_Enabled: 1
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IsTrigger: 0
+  m_UsedByEffector: 0
+  m_UsedByComposite: 0
+  m_Offset: {x: 0, y: 0}
+  m_SpriteTilingProperty:
+    border: {x: 0, y: 0, z: 0, w: 0}
+    pivot: {x: 0.5, y: 0.5}
+    oldSize: {x: 1, y: 1}
+    newSize: {x: 1, y: 1}
+    adaptiveTilingThreshold: 0.5
+    drawMode: 0
+    adaptiveTiling: 0
+  m_AutoTiling: 0
+  serializedVersion: 2
+  m_Size: {x: 1, y: 1}
+  m_EdgeRadius: 0
