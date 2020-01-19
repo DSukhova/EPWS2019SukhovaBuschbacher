@@ -18,23 +18,28 @@ namespace Assets.Scripts
             this.p0 = p0;
             this.p1 = p1;
             this.p2 = p2;
+        }        
+
+        float Sign(Vector2 p1, Vector2 p2, Vector2 p3)
+        {
+            return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
         }
 
-        public bool IsNodeInTriangle(Node node)
+        public bool PointInTriangle(Node pt)
         {
-            if (p0.x == Mathf.Infinity || p0.y == Mathf.Infinity || p1.x == Mathf.Infinity || p1.y == Mathf.Infinity || p2.x == Mathf.Infinity || p2.y == Mathf.Infinity)
-            {
-                return true;
-            }
+            // Quelle: https://stackoverflow.com/questions/2049582/how-to-determine-if-a-point-is-in-a-2d-triangle
 
-            //http://jsfiddle.net/PerroAZUL/zdaY8/1/
+            float d1, d2, d3;
+            bool has_neg, has_pos;
 
-            float A = 1 / 2 * (-p1.y * p2.x + p0.y * (-p1.x + p2.x) + p0.x * (p1.y - p2.y) + p1.x * p2.y);
-            int sign = A < 0 ? -1 : 1;
-            float s = (p0.y * p2.x - p0.x * p2.y + (p2.y - p0.y) * node.position.x + (p0.x - p2.x) * node.position.y) * sign;
-            float t = (p0.x * p1.y - p0.y * p1.x + (p0.y - p1.y) * node.position.x + (p1.x - p0.x) * node.position.y) * sign;
+            d1 = Sign(pt.position, p0, p1);
+            d2 = Sign(pt.position, p1, p2);
+            d3 = Sign(pt.position, p2, p0);
 
-            return s > 0 && t > 0 && (s + t) < 2 * A * sign;
+            has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+            has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+
+            return !(has_neg && has_pos);
         }
     }
 }

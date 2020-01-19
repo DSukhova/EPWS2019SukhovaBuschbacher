@@ -193,7 +193,7 @@ public class Cell_Map : MonoBehaviour
             //Debug.Log(graph.edges.Count);
             graph.Set_Alpha();
             graph.Generate_Paths();
-            //graph.edges.ForEach(o=>Debug.Log("Start: " + o.start.position + "Ende: " + o.end.position));
+            graph.edges.ForEach(o=>Debug.DrawLine(new Vector2(o.start.position.x, o.start.position.y), new Vector2(o.end.position.x, o.end.position.y), Color.green, 1000, true));
         }
 
         if (Input.GetKeyDown(KeyCode.W))

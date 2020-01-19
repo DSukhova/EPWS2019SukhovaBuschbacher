@@ -88,18 +88,16 @@ namespace Assets.Scripts
             List<Node> node_list = new List<Node>(nodes);
             List<Edge> edge_list = new List<Edge>();
             List<Triangle> cut_cones_list = new List<Triangle>();
-
-            Triangle Inf_Triangle = new Triangle(new Vector2(Mathf.Infinity, Mathf.Infinity), new Vector2(Mathf.Infinity, Mathf.Infinity), new Vector2(Mathf.Infinity, Mathf.Infinity));
-
+            
             // Suchbereich
 
             Vector2 p1;
             Vector2 p2;
             Vector2 p3;
             float distance;
-            float alpha = (a_max - a_min) / 2;
+            float alpha = ((a_max - a_min) / 2) * Mathf.PI / 180;
             float direction_angle;
-
+            
             foreach (Node n in node_list)
             {
                 cut_cones_list.Clear();                
@@ -107,23 +105,23 @@ namespace Assets.Scripts
                 // Liste aller sichtbaren Knoten im Suchbereich
                 // Ordnen der Liste
 
-                n.connected_nodes = Get_Search_Area_And_VC_Nodes(n, node_list, Inf_Triangle);             
-                n.connected_nodes = n.connected_nodes.OrderBy(o => Vector2.Distance(o.position, n.position)).ToList();                               
-
+                n.connected_nodes = Get_Search_Area_And_VC_Nodes(n, node_list);             
+                n.connected_nodes = n.connected_nodes.OrderBy(o => Vector2.Distance(o.position, n.position)).ToList();
+                
                 foreach (Node neighbor in n.connected_nodes)
-                {                    
-                    if (!cut_cones_list.Exists(o => o.IsNodeInTriangle(neighbor)))
+                {
+                    if (!cut_cones_list.Exists(o => o.PointInTriangle(neighbor)))
                     {                        
                         // Kante hinzufügen
 
                         if (!edge_list.Exists(o => o.IsEqualTo(new Edge(n, neighbor))))
                         {
                             edge_list.Add(new Edge(n, neighbor));
-                        }
+                        }                        
 
                         // Kegelförmigen Bereich ausschneiden
 
-                        p1 = n.position;
+                        p1 = new Vector2(n.position.x, n.position.y);
 
                         distance = 100;
 
@@ -131,13 +129,18 @@ namespace Assets.Scripts
                         
                         p2 = new Vector2((n.position.x + Mathf.Cos(direction_angle + alpha/2) * distance), (n.position.y + Mathf.Sin(direction_angle + alpha/2) * distance));
                         p3 = new Vector2((n.position.x + Mathf.Cos(direction_angle - alpha/2) * distance), (n.position.y + Mathf.Sin(direction_angle - alpha/2) * distance));
+                                                
+                        if (n.position == new Vector2Int(2,17) && neighbor.position == new Vector2Int(12, 15))
+                        {
+                            Debug.DrawLine(p1, p3, Color.green, 10000);
+                            Debug.DrawLine(p1, p2, Color.green, 10000);
+                        }
 
                         Triangle cut_cone = new Triangle(p1,p2,p3);
                         cut_cones_list.Add(cut_cone);
                     }
                 }
             }
-
             edges = edge_list;
         }
 
@@ -163,28 +166,6 @@ namespace Assets.Scripts
             return list;
         }
 
-        List<Node> Get_Search_Area_And_VC_Nodes(Node node, List<Node> nodes, Triangle t)
-        {
-            RaycastHit2D hit;
-            List<Node> list = new List<Node>();
-
-            foreach (Node p in nodes)
-            {
-                if (node != p)
-                {
-                    hit = Physics2D.Raycast(node.position, new Vector3(p.position.x - node.position.x, p.position.y - node.position.y, 0), Vector2.Distance(node.position, p.position));
-
-                    if (hit.collider != null || !t.IsNodeInTriangle(node))
-                    {                        
-                        continue;
-                    }
-
-                    list.Add(p);
-                }
-            }
-            return list;
-        }
-
         List<Node> Get_Search_Area_And_VC_Nodes(Node node, List<Node> nodes)
         {
             RaycastHit2D hit;
@@ -197,7 +178,7 @@ namespace Assets.Scripts
                     hit = Physics2D.Raycast(node.position, new Vector3(p.position.x - node.position.x, p.position.y - node.position.y, 0), Vector2.Distance(node.position, p.position));
 
                     if (hit.collider != null)
-                    {
+                    {                        
                         continue;
                     }
 
