@@ -132,8 +132,6 @@ namespace Assets.Scripts
                         p2 = new Vector2((n.position.x + Mathf.Cos(direction_angle + alpha/2) * distance), (n.position.y + Mathf.Sin(direction_angle + alpha/2) * distance));
                         p3 = new Vector2((n.position.x + Mathf.Cos(direction_angle - alpha/2) * distance), (n.position.y + Mathf.Sin(direction_angle - alpha/2) * distance));
 
-                        Debug.Log("start" + n.position + "p1: " +  p1 + "p2: " + p2 + "p3: " + p3 + "wird angegafft:" + neighbor.position);
-
                         Triangle cut_cone = new Triangle(p1,p2,p3);
                         cut_cones_list.Add(cut_cone);
                     }
