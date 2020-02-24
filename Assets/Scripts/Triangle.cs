@@ -27,6 +27,8 @@ namespace Assets.Scripts
 
         public bool PointInTriangle(Node pt)
         {
+            // Prüft ob sich ein Punkt in einem Dreieck befindet
+            // Relevant für die Minimierung von Knotenverbindungen im Graphen
             // Quelle: https://stackoverflow.com/questions/2049582/how-to-determine-if-a-point-is-in-a-2d-triangle
 
             float d1, d2, d3;

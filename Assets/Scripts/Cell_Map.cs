@@ -24,6 +24,10 @@ public class Cell_Map : MonoBehaviour
     public GameObject source;
     public Graph graph;
 
+    // gerichtete Flutung nach Knoten des Graphen
+    float alpha = 0.45f;
+    float beta = 0.9f;
+
     public float[,] Distance_Map;
     public bool[,] state;
     float penalty_factor = 0.5f; // veränderbarer Parameter für FFM; Einbeziehung von Personenhindernissen
@@ -80,12 +84,14 @@ public class Cell_Map : MonoBehaviour
         foreach (Vector2Int d in destinations)
         {
             Node node = new Node(d, Get_VC_of_Node(new Node(d), nodes));
+            node.type = 2;
             nodes.Add(node);
         }
 
         foreach (Vector2Int s in sources)
         {
             Node node = new Node(s, Get_VC_of_Node(new Node(s), nodes));
+            node.type = 3;
             nodes.Add(node);
         }
     }
@@ -190,15 +196,30 @@ public class Cell_Map : MonoBehaviour
             Set_All_Nodes();
             Get_Source_And_Dest_in_Nodes();
             graph.Generate_Graph(nodes);
-            //Debug.Log(graph.edges.Count);
             graph.Set_Alpha();
             graph.Generate_Paths();
-            graph.edges.ForEach(o=>Debug.DrawLine(new Vector2(o.start.position.x, o.start.position.y), new Vector2(o.end.position.x, o.end.position.y), Color.green, 1000, true));
+            graph.Set_All_Nodes();
+            //graph.A_Star(graph.nodes.Find(o=>o.position == new Vector2Int(0, 5)), graph.nodes.Find(o => o.position == new Vector2Int(29, 27)));
+            graph.Set_Max_Alpha();
+            graph.edges.ForEach(o => Debug.DrawLine(new Vector2(o.start.position.x, o.start.position.y), new Vector2(o.end.position.x, o.end.position.y), Color.green, 1000, true));
+            graph.GetPath(graph.nodes.Find(o => o.position == new Vector2Int(29, 27)));
+            
+            /*
+            foreach (Node n in graph.nodes)
+            {
+                Debug.Log("Node" + n.position);
+                foreach (Node c in n.connected_nodes)
+                {
+                    Debug.Log(c.position);
+                }
+            }
+            */
+
         }
 
         if (Input.GetKeyDown(KeyCode.W))
         {
-            Flood_Fill_All();
+            FMM_All();
             foreach (Human_Behaviour o in agents)
             {
                 if (o != null)
@@ -213,11 +234,190 @@ public class Cell_Map : MonoBehaviour
         }
     }
 
-    void Flood_Fill_All()
+    void FMM_All()
     {
+        /*
         foreach (Vector2Int o in destinations)
         {
             Flood_Fill(o.x, o.y);
+        }
+        */
+
+        /*
+        for (int i = 0; i < graph.path.ToArray().Length - 1; i++)
+        {
+            // A* benutzen; effizienter u. gerichtet
+            A_Star(graph.path.ToArray()[i+1].position, graph.path.ToArray()[i].position);
+            //FMM_Nodes(graph.path.ToArray()[i], graph.path.ToArray()[i + 1]);
+        }
+        */
+
+        Chain_A_Star(graph.path);
+    }
+
+    void Chain_A_Star(List<Node> c)
+    {
+        Node[] checkpoints = c.ToArray(); 
+        List<Unit> open_list = new List<Unit>();
+        List<Unit> closed_list = new List<Unit>();
+        int i = 0;
+
+        Unit current = new Unit(new Vector2Int(0, 0))
+        {
+            f = Mathf.Infinity
+        };
+        float tentative_g = 0;
+        float f_min;
+        open_list.Add(new Unit(checkpoints[0].position));
+
+        while (open_list.Count > 0)
+        {
+
+            // wählt günstigsten Kandidaten aus
+            f_min = Mathf.Infinity;
+            foreach (Unit o in open_list)
+            {
+                if (o.f <= f_min)
+                {
+                    f_min = o.f;
+                    current = o;
+                }
+            }
+                        
+            if (current.position == checkpoints[i + 1].position && checkpoints[i + 1] != checkpoints[checkpoints.Length - 1])
+            {
+                i++;
+                open_list.RemoveAll(o => o != null);
+                closed_list.RemoveAll(o => o != null);
+                Debug.Log(checkpoints[i].position);
+                open_list.Add(new Unit(checkpoints[i].position));
+            }
+            else if (current.position == checkpoints[checkpoints.Length - 1].position)
+            {
+                return;
+            }
+
+            // Kandidat wird betrachtet, und kann dementsprechend in die geschlossene Liste (geprüfte Nodes)
+            open_list.RemoveAll(o => o.position == current.position);
+            closed_list.Add(current);
+
+            // Für jeden Nachbarn von current werden h,g und f ermittelt 
+            foreach (GameObject successor in NullOrCell(current.position).GetComponent<Cell>().neighbors)
+            {
+                if (successor == null)
+                {
+                    continue;
+                }
+
+                Unit unit = new Unit(successor.GetComponent<Cell>().position2d);
+                unit.g = current.g + Vector2.Distance(unit.position, current.position);
+                unit.h = Vector2.Distance(unit.position, checkpoints[i + 1].position);
+                unit.f = unit.h + unit.g;
+
+                // wenn der Knoten bereits betrachtet wurde, überspringe diesen
+                if (closed_list.Contains(unit))
+                {
+                    continue;
+                }
+
+                tentative_g = current.g + Vector2.Distance(current.position, unit.position);
+
+                // wenn ein besserer Kandidat als successor in der open_list ist, überspringe diesen
+                if (open_list.Contains(unit) && unit.g <= tentative_g)
+                {
+                    continue;
+                }
+
+                // wenn der Knoten nicht bereits betrachtet wurden, und es keinen bessere in der offenen Liste gibt: berechne neu und setze parent
+                unit.parent = current;
+                unit.g = tentative_g;
+                unit.f = unit.g + unit.h;
+
+                if (!open_list.Contains(unit))
+                {
+                    NullOrCell(unit.position).traveltime = tentative_g;
+                    open_list.Add(unit);
+                }
+            }
+        }
+    }
+
+    void A_Star(Vector2Int start, Vector2Int end)
+    {       
+        List<Unit> open_list = new List<Unit>();
+        List<Unit> closed_list = new List<Unit>();
+
+        Unit current = new Unit(new Vector2Int(0, 0))
+        {
+            f = Mathf.Infinity
+        };
+        float tentative_g = 0;
+        float f_min;
+        open_list.Add(new Unit(start));
+
+        while (open_list.Count > 0)
+        {
+
+            // wählt günstigsten Kandidaten aus
+            f_min = Mathf.Infinity;
+            foreach (Unit o in open_list)
+            {
+                if (o.f <= f_min)
+                {
+                    f_min = o.f;
+                    current = o;
+                }
+            }
+
+            if (current.position == end)
+            {
+                return;
+            }
+
+            // Kandidat wird betrachtet, und kann dementsprechend in die geschlossene Liste (geprüfte Nodes)
+            open_list.RemoveAll(o => o.position == current.position);
+            closed_list.Add(current);
+
+            // Für jeden Nachbarn von current werden h,g und f ermittelt 
+            foreach (GameObject successor in NullOrCell(current.position).GetComponent<Cell>().neighbors)
+            {
+                if (successor == null)
+                {
+                    continue;
+                }
+                                
+                Unit unit = new Unit(successor.GetComponent<Cell>().position2d);
+                unit.g = current.g + Vector2.Distance(unit.position, current.position);
+                unit.h = Vector2.Distance(unit.position, end);
+                unit.f = unit.h + unit.g;
+
+                // wenn der Knoten bereits betrachtet wurde, überspringe diesen
+                if (closed_list.Contains(unit))
+                {
+                    continue;
+                }
+
+                tentative_g = current.g + Vector2.Distance(current.position, unit.position);
+
+                // wenn ein besserer Kandidat als successor in der open_list ist, überspringe diesen
+                if (open_list.Contains(unit) && unit.g <= tentative_g)
+                {
+                    continue;
+                }
+
+                // wenn der Knoten nicht bereits betrachtet wurden, und es keinen bessere in der offenen Liste gibt: berechne neu und setze parent
+                unit.parent = current;
+                unit.g = tentative_g;
+                unit.f = unit.g + unit.h;
+
+                if (!open_list.Contains(unit))
+                {
+                    //Debug.Log("curpos: " + current.position + " tentative: " + tentative_g + " unit: " + unit.position);
+                    //NullOrCell(unit.position).traveltime = alpha * tentative_g + (1 - alpha) * beta * Vector2.Distance(unit.position, start.position);
+                    NullOrCell(unit.position).traveltime = tentative_g;
+                    open_list.Add(unit);
+                }
+            }
         }
     }
 
@@ -234,7 +434,7 @@ public class Cell_Map : MonoBehaviour
         }
     }
 
-    void Flood_Fill(int x_start, int y_start)
+    void Fast_Marching_Method(int x_start, int y_start)
     {
 
         List<Vector2Int> candidates = new List<Vector2Int>();
@@ -389,6 +589,173 @@ public class Cell_Map : MonoBehaviour
                     {
                         travel_cost = lowest_even + Mathf.Sqrt(Mathf.Pow(w, 2) - 4 * (Mathf.Pow(lowest_even - lowest_odd, 2))) / 2;
                     }
+                    
+                    Distance_Map[temp_neighbor.x, temp_neighbor.y] = travel_cost;
+                    cell_array[temp_neighbor.x, temp_neighbor.y].GetComponent<Cell>().traveltime = travel_cost;
+
+                }
+            }
+        }
+    }
+
+    void FMM_Nodes(Node start, Node end)
+    {        
+        List<Vector2Int> candidates = new List<Vector2Int>();
+
+        Vector2Int lowest_candidate = new Vector2Int(-1, -1);
+        Vector2Int temp_neighbor;
+        float dx;
+        float dy;
+        float d_1_to_5;
+        float d_3_to_7;
+
+        for (int i = 0; i < x_range; i++)
+        {
+            for (int j = 0; j < y_range; j++)
+            {
+                Distance_Map[i, j] = Mathf.Infinity;
+                state[i, j] = true;
+            }
+        }
+
+        Distance_Map[end.position.x, end.position.y] = 0;
+        cell_array[end.position.x, end.position.y].GetComponent<Cell>().traveltime = 0;
+
+        candidates.Add(cell_array[start.position.x, start.position.y].GetComponent<Cell>().position2d);
+
+        while (candidates.Count > 0)
+        {
+            float lowest = Mathf.Infinity;
+
+            foreach (Vector2Int o in candidates)
+            {
+                if (Distance_Map[o.x, o.y] <= lowest)
+                {
+                    lowest = Distance_Map[o.x, o.y];
+                    lowest_candidate = o;
+                }
+            }
+
+            state[lowest_candidate.x, lowest_candidate.y] = false;
+
+            candidates.RemoveAll(o => (o.x == lowest_candidate.x && o.y == lowest_candidate.y));
+
+            // Nachbarn des Lowest Candidate
+
+            for (int k = 0; k < cell_array[lowest_candidate.x, lowest_candidate.y].GetComponent<Cell>().neighbors.Length; k++)
+            {
+
+                if (cell_array[lowest_candidate.x, lowest_candidate.y].GetComponent<Cell>().neighbors[k] != null)
+                {
+                    temp_neighbor = cell_array[lowest_candidate.x, lowest_candidate.y].GetComponent<Cell>().neighbors[k].GetComponent<Cell>().position2d;
+                }
+                else
+                {
+                    continue;
+                }
+
+                // für alle lebenden Nachbarn führe aus
+                // Neighbor Tiles Nummerierung
+                //  5 6 7
+                //  4 X 0   
+                //  3 2 1
+
+                if (temp_neighbor != null && state[temp_neighbor.x, temp_neighbor.y] && cell_array[temp_neighbor.x, temp_neighbor.y].GetComponent<Cell>().object_type != 1)
+                {
+
+                    candidates.Add(temp_neighbor);
+
+                    float d_right = Mathf.Infinity;
+                    float d_left = Mathf.Infinity;
+                    float d_down = Mathf.Infinity;
+                    float d_up = Mathf.Infinity;
+                    float d_1 = Mathf.Infinity;
+                    float d_3 = Mathf.Infinity;
+                    float d_5 = Mathf.Infinity;
+                    float d_7 = Mathf.Infinity;
+
+
+                    // Werte der Distance Map: Abstände von rechts, links, unten, oben zur Nachbarzelle k
+                    if (cell_array[temp_neighbor.x, temp_neighbor.y].GetComponent<Cell>().neighbors[0] != null)
+                    {
+                        d_right = Distance_Map[temp_neighbor.x + 1, temp_neighbor.y];
+                    }
+
+                    if (cell_array[temp_neighbor.x, temp_neighbor.y].GetComponent<Cell>().neighbors[4] != null)
+                    {
+                        d_left = Distance_Map[temp_neighbor.x - 1, temp_neighbor.y];
+                    }
+
+                    if (cell_array[temp_neighbor.x, temp_neighbor.y].GetComponent<Cell>().neighbors[2] != null)
+                    {
+                        d_down = Distance_Map[temp_neighbor.x, temp_neighbor.y - 1];
+                    }
+
+                    if (cell_array[temp_neighbor.x, temp_neighbor.y].GetComponent<Cell>().neighbors[6] != null)
+                    {
+                        d_up = Distance_Map[temp_neighbor.x, temp_neighbor.y + 1];
+                    }
+
+                    if (cell_array[temp_neighbor.x, temp_neighbor.y].GetComponent<Cell>().neighbors[1] != null)
+                    {
+                        d_1 = Distance_Map[temp_neighbor.x + 1, temp_neighbor.y - 1];
+                    }
+
+                    if (cell_array[temp_neighbor.x, temp_neighbor.y].GetComponent<Cell>().neighbors[3] != null)
+                    {
+                        d_3 = Distance_Map[temp_neighbor.x - 1, temp_neighbor.y - 1];
+                    }
+
+                    if (cell_array[temp_neighbor.x, temp_neighbor.y].GetComponent<Cell>().neighbors[5] != null)
+                    {
+                        d_5 = Distance_Map[temp_neighbor.x - 1, temp_neighbor.y + 1];
+                    }
+
+                    if (cell_array[temp_neighbor.x, temp_neighbor.y].GetComponent<Cell>().neighbors[7] != null)
+                    {
+                        d_7 = Distance_Map[temp_neighbor.x + 1, temp_neighbor.y + 1];
+                    }
+
+                    dx = Mathf.Min(d_right, d_left);
+                    dy = Mathf.Min(d_down, d_up);
+                    d_1_to_5 = Mathf.Min(d_1, d_5);
+                    d_3_to_7 = Mathf.Min(d_3, d_7);
+
+                    float lowest_even = Mathf.Min(dx, dy);
+                    float lowest_odd = Mathf.Min(d_1_to_5, d_3_to_7);
+
+                    // w ist die Ausbreitungsgeschwindigkeit der Welle; Mit der Ausbreitung der Welle über die Zellen erhöht sich die Traveltime
+                    // mit dem Wert von w
+                    // Fußgänger verlangsamen die Ausbreitung der Welle, also erhöhen sich die Reisekosten (travel_cost)
+
+                    float w = 1;
+
+                    if (cell_array[temp_neighbor.x, temp_neighbor.y].GetComponent<Cell>().is_occupied == true)
+                    {
+                        w = 1 * (1 + penalty_factor);
+                    }
+
+                    // Nach Dijkstra
+                    float dijkstra_value = Mathf.Min(dx + w, dy + w, d_1_to_5 + w, d_3_to_7 + w);
+
+                    // Nach Fast Marching Method
+                    float travel_cost;
+                    if (lowest_even <= lowest_odd)
+                    {
+                        travel_cost = lowest_even + w / 2;
+                    }
+                    else if (w <= 2 * Mathf.Sqrt(2) * (lowest_even - lowest_odd))
+                    {
+                        travel_cost = lowest_odd + Mathf.Sqrt(2) * w / 2;
+                    }
+                    else
+                    {
+                        travel_cost = lowest_even + Mathf.Sqrt(Mathf.Pow(w, 2) - 4 * (Mathf.Pow(lowest_even - lowest_odd, 2))) / 2;
+                    }
+
+                    // "gerichtete Flutung"
+                    float k_cost = alpha * travel_cost + (1 - alpha) * beta * Vector2.Distance(cell_array[temp_neighbor.x, temp_neighbor.y].GetComponent<Cell>().position2d, start.position);
+                    travel_cost = k_cost;
 
                     Distance_Map[temp_neighbor.x, temp_neighbor.y] = travel_cost;
                     cell_array[temp_neighbor.x, temp_neighbor.y].GetComponent<Cell>().traveltime = travel_cost;
@@ -396,6 +763,8 @@ public class Cell_Map : MonoBehaviour
                 }
             }
         }
+
+
     }
 
     void GetAllAgents()
@@ -426,6 +795,7 @@ public class Cell_Map : MonoBehaviour
             {
                 try
                 {
+                    // Alle Nachbarn in diagonaler Richtung zu aktuellem Hindernis auswählen
                     neighbor_cc = cur_cell.neighbors[2 * i + 1].GetComponent<Cell>();
                 }
                 catch
@@ -433,12 +803,14 @@ public class Cell_Map : MonoBehaviour
                     continue;
                 }
 
+                // Wenn der diag. Nachbar Hindernis oder keine Zelle ist, weitersuchen
                 if (neighbor_cc == null || neighbor_cc.object_type == 1)
                 {
                     neighbor_cc.invalidNode = true;
                     continue;
                 }
                 
+                // Wenn in beiden vertikalen oder horizontalen Richtungen ein Hindernis nachbar ist, markiere die Zelle als ungültiger Node
                 for (int j = 0; j < 4; j++)
                 {
                     if (neighbor_cc.neighbors[2 * j].GetComponent<Cell>().object_type == 1 || neighbor_cc.neighbors[2 * j] == null)
@@ -448,11 +820,15 @@ public class Cell_Map : MonoBehaviour
                     }
                 }
 
+                // Wenn gültiger Node gefunden, bilde einen Vektor aus Hindernisecke und potentiellem Knoten; Der eigentliche Knoten wird mit einer Entfernung zur Hindernisecke platziert
+                // sodass die Knoten diagonal mit einer einstellbaren Entfernung zu den Hindernisecken stehen
                 if (neighbor_cc.invalidNode != true)
-                {                    
+                {
+                    // direction ist der erzeugte Vektor, der für die Platzierung des Knotens (new_Node) auf der Diagonalen verwendet wird
                     direction = new Vector2Int(neighbor_cc.x_pos - o.x, neighbor_cc.y_pos - o.y);
                     new_Node = new Vector2Int(o.x + direction.x * node_distance, o.y + direction.y * node_distance);
-                    
+
+                    // Wenn Sichtkontakt zu Knoten und Hindernisecke besteht, platziere den Knoten. Falls nicht, wird der Knoten an den halben Abstand zwischen Hindernisecke und Hindernis (welches den Sichtkontakt behindert) platziert
                     if (Get_View_Contact(neighbor_cc.position2d, direction))
                     {
                         cell_array[new_Node.x, new_Node.y].GetComponent<Cell>().isNodeAlready = true;
@@ -484,6 +860,7 @@ public class Cell_Map : MonoBehaviour
 
     void Set_All_Nodes()
     {
+        // Initialisiert für alle Nodes die connected Node Liste, in welcher alle Nodes gespeichert sind mit denen der eigentliche Node sichtkontakt hat
         RaycastHit2D hit;
 
         nodes.Clear();
@@ -595,6 +972,7 @@ public class Cell_Map : MonoBehaviour
 
     List<Vector2Int> Get_VC_of_Node(Vector2Int node, List<Vector2Int> nodes)
     {
+        // Liefert alle Nodes mit denen node Sichtkontakt hat
         RaycastHit2D hit;
         List<Vector2Int> list = new List<Vector2Int>();
 
@@ -617,6 +995,7 @@ public class Cell_Map : MonoBehaviour
 
     List<Node> Get_VC_of_Node(Node node, List<Node> nodes)
     {
+        // Liefert alle Nodes mit denen node Sichtkontakt hat
         RaycastHit2D hit;
         List<Node> list = new List<Node>();
 
@@ -639,6 +1018,8 @@ public class Cell_Map : MonoBehaviour
 
     bool Nodes_Too_Near(List<Vector2Int> list)
     {
+        // Prüft ob Nodes zu nahe sind
+
         foreach (Vector2Int o in list)
         {
             foreach (Vector2Int p in list)

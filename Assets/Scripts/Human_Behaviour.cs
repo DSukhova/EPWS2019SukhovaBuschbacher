@@ -13,7 +13,7 @@ public class Human_Behaviour : MonoBehaviour
     public int x, y;
     // Neighbor Tiles Nummerierung
     //  5 6 7
-    //  4 X 0   
+    //  4 8 0   
     //  3 2 1
 
     // Weg finden die Bewegung kontinuierlich zu gestalten
@@ -44,6 +44,16 @@ public class Human_Behaviour : MonoBehaviour
         // Move; Flags der Zelle werden auf false gesetzt, damit sie wieder reservierbar und begehbar sind; Bewegung wird durchgeführt; Nächste Zelle wird auf besetzt gesetzt;
         int i = getDirection();
 
+        if (i == 8 && cmap.cell_array[x, y].GetComponent<Cell>().object_type == 2)
+        {
+            cmap.cell_array[x, y].GetComponent<Cell>().is_occupied = false;
+            Destroy(gameObject);
+        }
+        else if (i==8)
+        {
+            return;
+        }
+
         if (i >= 0 && cmap.cell_array[x, y].GetComponent<Cell>().object_type != 2)
         {
             cmap.cell_array[x, y].GetComponent<Cell>().is_occupied = false;
@@ -56,7 +66,7 @@ public class Human_Behaviour : MonoBehaviour
         {
             cmap.cell_array[x, y].GetComponent<Cell>().is_occupied = false;
             Destroy(gameObject);
-        }
+        }        
     }
 
     GameObject[] getNeighbors()
@@ -82,6 +92,7 @@ public class Human_Behaviour : MonoBehaviour
         int direction = 0;
         int[] possible_directions = new int[8];
         int max_pos_neighbors = 0;
+        float current_cell = NullOrCell(this.x, this.y).GetComponent<Cell>().travel_cost;
         
         for (int i = 0; i < getNeighbors().Length; i++)
         {
@@ -107,6 +118,11 @@ public class Human_Behaviour : MonoBehaviour
             }
         }
 
+        if (lowest > current_cell)
+        {
+            return 8;
+        }
+
         int k = -1;
 
         if (max_pos_neighbors > 0)
@@ -115,6 +131,22 @@ public class Human_Behaviour : MonoBehaviour
         }
 
         return k;
+    }
+
+    public int GetDirection_Nodes()
+    {
+
+        float lowest = Mathf.Infinity;
+        int direction = 0;
+
+        for (int i = 0; i < getNeighbors().Length; i++)
+        {
+            if (getNeighbors()[i])
+            {
+            }
+        }
+
+        return 0;
     }
 
     Vector3 NeighborToCell(int i)

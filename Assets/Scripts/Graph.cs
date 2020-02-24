@@ -11,21 +11,27 @@ namespace Assets.Scripts
     {
         public List<Edge> edges;
         public List<Node> nodes;
+        public List<Node> path;
         
         public float a_min;
         public float a_max;
-        public float max_Alpha;
+        public float alpha;
+        float epsilon = 160;
 
         public Graph(List<Edge> edges)
         {
+            path = new List<Node>();
             this.edges = edges;
         }
 
         public Graph(){
+            path = new List<Node>();
         }
 
         public void Set_Alpha()
         {
+            // Sucht den jeweils größten und Kleinsten Winkel zwischen zwei ausgehenden Kanten im Graph
+
             float temp_Angle;
             float min_Angle = Mathf.Infinity;
             float max_Angle = Mathf.NegativeInfinity;
@@ -37,7 +43,12 @@ namespace Assets.Scripts
                     if (e_1.start.position == e_2.start.position && !e_2.IsEqualTo(e_1))
                     {
                         temp_Angle = Vector2.Angle(e_1.vector, e_2.vector);
-                        
+
+                        if (temp_Angle == 0)
+                        {
+                            temp_Angle = 180;
+                        }
+
                         if (temp_Angle < min_Angle)
                         {
                             min_Angle = temp_Angle;
@@ -48,39 +59,46 @@ namespace Assets.Scripts
                             max_Angle = temp_Angle;
                         }
                         
-                    } else if (e_1.end.position == e_2.end.position && !e_1.IsEqualTo(e_2))
-                    {
-                        temp_Angle = Vector2.Angle(e_1.vector, e_2.vector);
-                        
-                        if (temp_Angle < min_Angle)
-                        {
-                            min_Angle = temp_Angle;
-                        }
-
-                        if (temp_Angle > max_Angle)
-                        {
-                            max_Angle = temp_Angle;
-                        }
                     }
                 }
             }
 
             a_max = max_Angle;
             a_min = min_Angle;
+            alpha = a_max - a_min;
         }
 
         public void Set_Max_Alpha()
         {
-            float Alpha = (a_max - a_min) / 2;
-
-            while (false)
+            // Nach Kneidl
+            float alpha = (a_max - a_min) / 2;
+            float temp;
+            
+            while (alpha < Mathf.Clamp(epsilon, 0, 179))
             {
+                if (A_Star(nodes.Find(o => o.type == 3), nodes.Find(o => o.type == 2)))
+                {
+                    temp = alpha;
+                    alpha = (a_max - alpha) / 2 + alpha;
+                    a_min = temp;
+                } else
+                {
+                    Debug.Log("ds");
+                    temp = alpha;
+                    alpha = alpha - (a_max - alpha) / 2;
+                    a_max = temp;
+                }
+
+                this.alpha = alpha;
                 
+                Generate_Paths();
+                Set_All_Nodes();
             }
         }
 
         public void Generate_Paths()
         {
+            // Kein Rückgabewert: Setzt das Feld 'edges'
             // generiert aus Nav_Nodes Pfade:
             // Kegelbasierter Algorithmus nach Kneidl
 
@@ -88,19 +106,19 @@ namespace Assets.Scripts
             List<Node> node_list = new List<Node>(nodes);
             List<Edge> edge_list = new List<Edge>();
             List<Triangle> cut_cones_list = new List<Triangle>();
-            
+
             // Suchbereich
 
             Vector2 p1;
             Vector2 p2;
             Vector2 p3;
             float distance;
-            float alpha = ((a_max - a_min) / 2) * Mathf.PI / 180;
+            float alpha = this.alpha / 2 * Mathf.PI / 180;
             float direction_angle;
             
             foreach (Node n in node_list)
             {
-                cut_cones_list.Clear();                
+                cut_cones_list.Clear();
                 
                 // Liste aller sichtbaren Knoten im Suchbereich
                 // Ordnen der Liste
@@ -111,12 +129,12 @@ namespace Assets.Scripts
                 foreach (Node neighbor in n.connected_nodes)
                 {
                     if (!cut_cones_list.Exists(o => o.PointInTriangle(neighbor)))
-                    {                        
+                    {
+                        Edge e = new Edge(n, neighbor);
                         // Kante hinzufügen
-
-                        if (!edge_list.Exists(o => o.IsEqualTo(new Edge(n, neighbor))))
+                        if (!edge_list.Exists(o => o.IsEqualTo(e)))
                         {
-                            edge_list.Add(new Edge(n, neighbor));
+                            edge_list.Add(e);
                         }                        
 
                         // Kegelförmigen Bereich ausschneiden
@@ -128,13 +146,7 @@ namespace Assets.Scripts
                         direction_angle = Mathf.Atan2(neighbor.position.y - n.position.y, neighbor.position.x - n.position.x);
                         
                         p2 = new Vector2((n.position.x + Mathf.Cos(direction_angle + alpha/2) * distance), (n.position.y + Mathf.Sin(direction_angle + alpha/2) * distance));
-                        p3 = new Vector2((n.position.x + Mathf.Cos(direction_angle - alpha/2) * distance), (n.position.y + Mathf.Sin(direction_angle - alpha/2) * distance));
-                                                
-                        if (n.position == new Vector2Int(2,17) && neighbor.position == new Vector2Int(12, 15))
-                        {
-                            Debug.DrawLine(p1, p3, Color.green, 10000);
-                            Debug.DrawLine(p1, p2, Color.green, 10000);
-                        }
+                        p3 = new Vector2((n.position.x + Mathf.Cos(direction_angle - alpha/2) * distance), (n.position.y + Mathf.Sin(direction_angle - alpha/2) * distance));                        
 
                         Triangle cut_cone = new Triangle(p1,p2,p3);
                         cut_cones_list.Add(cut_cone);
@@ -190,6 +202,8 @@ namespace Assets.Scripts
 
         public void Generate_Graph(List<Node> nodes)
         {
+            // verbindet alle Knoten in Sichtkontakt miteinander einmal
+            // dient als Grundlage für Generate Paths, sowie Set_Alpha und Set_Max_Alpha
             List<Node> node_list = new List<Node>(nodes);
             List<Edge> edge_list = new List<Edge>();
 
@@ -210,6 +224,116 @@ namespace Assets.Scripts
 
             this.nodes = node_list;
             this.edges = edge_list;
+        }
+
+        public bool A_Star(Node Start, Node End)
+        {
+            if (edges != null)
+            {
+                List<Node> open_list = new List<Node>();
+                List<Node> closed_list = new List<Node>();
+                Node current = new Node(new Vector2Int(0, 0))
+                {
+                    f = Mathf.Infinity
+                };
+                float tentative_g = 0;
+                float f_min;
+                open_list.Add(Start);
+
+                while (open_list.Count > 0)
+                {
+
+                    // wählt günstigsten Kandidaten aus
+                    f_min = Mathf.Infinity;
+                    foreach (Node o in open_list)
+                    {
+                        if (o.f <= f_min)
+                        {
+                            f_min = o.f;
+                            current = o;
+                        }
+                    }
+
+                    if (current == End)
+                    {
+                        return true;
+                    }
+
+                    // Kandidat wird betrachtet, und kann dementsprechend in die geschlossene Liste (geprüfte Nodes)
+                    open_list.RemoveAll(o => o.position == current.position);
+                    closed_list.Add(current);
+
+                    // Für jeden Nachbarn von current werden h,g und f ermittelt 
+                    foreach (Node successor in current.connected_nodes)
+                    {
+                        successor.g = current.g + Vector2.Distance(successor.position, current.position);
+                        successor.h = Vector2.Distance(successor.position, End.position);
+                        successor.f = successor.h + successor.g;
+
+                        // wenn der Knoten bereits betrachtet wurde, überspringe diesen
+                        if (closed_list.Contains(successor))
+                        {
+                            continue;
+                        }
+
+                        tentative_g = current.g + Vector2.Distance(current.position, successor.position);
+
+                        // wenn ein besserer Kandidat als successor in der open_list ist, überspringe diesen
+                        if (open_list.Contains(successor) && successor.g <= tentative_g)
+                        {
+                            continue;
+                        }
+
+                        // wenn der Knoten nicht bereits betrachtet wurden, und es keinen bessere in der offenen Liste gibt: berechne neu und setze parent
+                        successor.parent = current;
+                        successor.g = tentative_g;
+                        successor.f = successor.g + successor.h;
+
+                        if (!open_list.Contains(successor))
+                        {
+                            open_list.Add(successor);
+                        }
+                    }
+                }
+                return false;
+            }
+            else return false;
+        }
+
+        public void Set_All_Nodes()
+        {
+            // Setzt das Feld 'nodes' nach gegebenen Edges
+            
+            foreach (Node n in nodes)
+            {
+                n.connected_nodes.Clear();
+                foreach (Edge e in edges)
+                {
+                    if (n == e.start)
+                    {
+                        n.connected_nodes.Add(e.end);
+                    } 
+
+                    if (n == e.end)
+                    {
+                        n.connected_nodes.Add(e.start);
+                    }
+                }
+            }
+        }
+        
+        public Node GetPath(Node cur)
+        {
+            // Gibt Rekursiv den Pfad aus A* zurück
+            // macht sich das Feld parent der Nodes zu Nutze
+            if (cur != null)
+            {
+                path.Add(cur);
+                return GetPath(cur.parent);
+            }
+            else
+                //path.Reverse();
+                return null;
         }
     }
 }
